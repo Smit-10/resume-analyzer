@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session
 from app.models.resume import Resume
 from app.models.user import User
 from app.config import UPLOAD_DIRECTORY
+from pathlib import Path
+from app.services.pdf_service import extract_text_from_pdf
 
 UPLOAD_DIRECTORY.mkdir(parents=True, exist_ok=True)
 
@@ -54,3 +56,18 @@ def upload_resume(file: UploadFile, current_user: User, db: Session) -> Resume:
             os.remove(stored_file_path)
         
         raise
+    
+def get_resume_text(resume: Resume) -> str:
+    pdf_path = Path(resume.file_path)
+    
+    return extract_text_from_pdf(pdf_path)
+
+# below function is used when we want to download, analyze,
+# delete or preview the resume (it will give back the active resume)
+def get_active_resume(current_user: User, db: Session) -> Resume:
+    resume = db.query(Resume).filter(Resume.user_id == current_user.id, Resume.is_active == True).first()
+
+    if resume is None:
+        raise ValueError("No active resume found.")
+    
+    return resume
