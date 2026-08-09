@@ -5,8 +5,9 @@
     "Databases": ["SQL", "PostgreSQL", "MySQL", "MongoDB", "SQLite", "Redis", "Oracle"],
     "DevOps": ["Docker", "Kubernetes", "Git", "GitHub Actions", "Jenkins", "Linux"],
     "Cloud": ["AWS", "Azure", "Google Cloud Platform", "Firebase"],
-    "Machine Learning": ["TensorFlow", "PyTorch", "Scikit-learn", "OpenCV", "NLP", "Computer Vision", "LLM", "RAG", "LangChain", "Hugging Face", "FAISS", "ChromaDB"],
+    "Machine Learning": ["Machine Learning", "Deep Learning", "TensorFlow", "PyTorch", "Scikit-learn", "OpenCV", "NLP", "Computer Vision", "LangChain", "Hugging Face", "FAISS", "ChromaDB"],
     "Data Science": ["NumPy", "Pandas", "Matplotlib", "Seaborn", "Power BI", "Tableau"],
     "Tools": ["VS Code", "Postman", "Figma", "Jupyter", "GitHub"],
-    "Soft Skills": ["Leadership", "Communication", "Problem Solving", "Teamwork", "Critical Thinking"]
+    "Soft Skills": ["Leadership", "Communication", "Problem Solving", "Teamwork", "Critical Thinking"],
+    "AI/LLM": ["LLM", "Generative AI", "Prompt Engineering", "Transformers", "Retrieval-Augmented Generation"]
 }

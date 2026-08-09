@@ -13,5 +13,4 @@ class Resume(Base):
     uploaded_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     user = relationship("User", back_populates="resumes")
     
-    # uselist = False tells that as it is one-to-one relation, do not give back list when asked resume.analysis because by default it returns a list of object
-    analysis = relationship("Analysis", back_populates="resume", uselist=False, cascade="all, delete-orphan")
+    analyses = relationship("Analysis", back_populates="resume", cascade="all, delete-orphan")

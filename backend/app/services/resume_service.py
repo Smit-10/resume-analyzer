@@ -71,3 +71,41 @@ def get_active_resume(current_user: User, db: Session) -> Resume:
         raise ValueError("No active resume found.")
     
     return resume
+
+def delete_resume(resume_id: int, current_user: User, db: Session):
+    # finding the resume belonging to the current user
+    resume = (
+        db.query(Resume)
+        .filter(Resume.id == resume_id, Resume.user_id == current_user.id)
+        .first()
+    )
+    
+    if not resume:
+        raise ValueError("Resume not found.")
+    
+    # remember whether the resume being deleted is active
+    was_active = resume.is_active
+    
+    # save the file path before deleting the database object
+    file_path = Path(resume.file_path)
+    
+    db.delete(resume)
+    
+    # if the deleted resume was active, make the latest resume active
+    if was_active:
+        # query for finding another resume, excluding the one we're deleting.
+        another_resume = (
+            db.query(Resume)
+            .filter(Resume.user_id == current_user.id, Resume.id != resume_id)
+            .order_by(Resume.uploaded_at.desc())
+            .first()
+        )
+        
+        if another_resume:
+            another_resume.is_active = True
+            
+    db.commit()
+    
+    # delete the physical file after successfull database operation
+    if file_path.exists():
+        os.remove(file_path)

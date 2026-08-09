@@ -7,12 +7,11 @@ class Analysis(Base):
     __tablename__ = "analyses"
     
     id = Column(Integer, primary_key=True)
-    resume_id = Column(Integer, ForeignKey("resumes.id", ondelete="CASCADE"), unique=True, nullable=False)
+    resume_id = Column(Integer, ForeignKey("resumes.id", ondelete="CASCADE"), nullable=False)
     job_description = Column(Text, nullable=False)
     score = Column(Float, nullable=False)
     matched_skills = Column(JSONB, nullable=False)
     missing_skills = Column(JSONB, nullable=False)
-    suggestions = Column(JSONB, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     
-    resume = relationship("Resume", back_populates="analysis")
+    resume = relationship("Resume", back_populates="analyses")
