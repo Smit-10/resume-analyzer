@@ -7,6 +7,7 @@ from app.models.user import User
 from app.config import UPLOAD_DIRECTORY
 from pathlib import Path
 from app.services.pdf_service import extract_text_from_pdf
+from app.services.redis_service import delete_reviews_for_resume
 
 UPLOAD_DIRECTORY.mkdir(parents=True, exist_ok=True)
 
@@ -109,3 +110,6 @@ def delete_resume(resume_id: int, current_user: User, db: Session):
     # delete the physical file after successfull database operation
     if file_path.exists():
         os.remove(file_path)
+    
+    # Deleting all Redis reviews for this specific resume
+    delete_reviews_for_resume(resume_id)

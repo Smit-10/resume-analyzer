@@ -9,6 +9,9 @@ from app.schemas.analysis import ExtractedTextResponse, ResumeAnalysisResponse, 
 from app.services.analysis_history_service import get_analysis_history, get_analysis_by_id
 from app.services.analysis_service import analyze_resume
 from app.services.resume_service import upload_resume, get_resume_text, get_active_resume, delete_resume
+from app.services.resume_review_service import get_resume_review
+from app.schemas.resume_review import ResumeReviewResponse
+from app.exceptions.llm_exceptions import LLMResponseError, LLMServiceError
 
 router = APIRouter(
     prefix="/resume",
@@ -71,3 +74,30 @@ def delete_resume_endpoint(resume_id: int, current_user: User = Depends(get_curr
     
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+# Resume Review using LLM
+@router.post("/review", response_model=ResumeReviewResponse)
+def resume_review(job_description: str = Form(...), current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    try:
+        # getting users active resume
+        active_resume = get_active_resume(current_user=current_user, db=db)
+        
+        # generate or retrieve review
+        review = get_resume_review(resume=active_resume, job_description=job_description, db=db)
+        
+        return review
+    
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    
+    except LLMServiceError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, 
+            detail="Resume review service is temporarily unavailable. Please try again later."
+        )
+    
+    except LLMResponseError as e:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="The AI service returned an invalid response. Please try again."
+        )
