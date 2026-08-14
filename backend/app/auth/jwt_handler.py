@@ -2,19 +2,18 @@ from datetime import datetime, timedelta, UTC
 from typing import Any
 import jwt
 from jwt import ExpiredSignatureError, InvalidTokenError
-from fastapi import HTTPException, status, Depends
-from fastapi.security import OAuth2PasswordBearer
+from fastapi import HTTPException, status, Depends, Request
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User
 from app.config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
 
 # OAuth2 Dependency
-oauth2_scheme = OAuth2PasswordBearer(
-    tokenUrl="auth/login"
-)
+# oauth2_scheme = OAuth2PasswordBearer(
+#     tokenUrl="auth/login"
+# )
 
-def create_access_token(data: dict[str: Any]) -> str:
+def create_access_token(data: dict[str, Any]) -> str:
     to_encode = data.copy()
     expire = datetime.now(UTC) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     
@@ -46,8 +45,20 @@ def verify_access_token(token: str) -> dict[str, Any]:
             detail="Invalid token."
         )
 
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
+def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
+    # Get JWT from HttpOnly Cookie
+    token = request.cookies.get("access_token")
+    
+    if token is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not Authenticated."
+        )
+    
+    # Verify JWT
     payload = verify_access_token(token)
+    
+    # get user id
     user_id = payload.get("sub")
     
     if user_id is None:
@@ -57,5 +68,11 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
         )
     
     user = db.query(User).filter(User.id == int(user_id)).first()
+    
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User not found."
+        )
     
     return user  # returns the data of current user

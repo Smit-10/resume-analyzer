@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Response
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from app.database import get_db
@@ -21,14 +21,27 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
-@router.post("/login", response_model=Token, status_code=status.HTTP_200_OK)
-def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+@router.post("/login", status_code=status.HTTP_200_OK)
+def login(response: Response, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     try:
         user_data = UserLogin(
             email = form_data.username,
             password = form_data.password
         )
-        return login_user(user_data, db)
+        token = login_user(user_data, db)
+        
+        response.set_cookie(
+            key="access_token",
+            value=token.access_token,
+            httponly=True,
+            secure=False,   # make it True when using HTTPS
+            samesite="lax",
+            max_age=60*60
+        )
+        
+        return {
+            "message": "Login successful"
+        }
     
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
