@@ -1,8 +1,10 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
+import { useAuth } from "../../context/useAuth";
 
 function Login() {
     const navigate = useNavigate()
+    const { checkAuth } = useAuth()
 
     const [email, setEmail] = useState("")
     const [password, setPassword] = useState("")
@@ -40,6 +42,9 @@ function Login() {
             if (!response.ok){
                 throw new Error(data.detail || "Invalid email or password.")
             }
+
+            // refreshing the user information in AuthContext
+            await checkAuth(  )
 
             navigate("/dashboard")
         }

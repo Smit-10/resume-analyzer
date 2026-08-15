@@ -1,7 +1,9 @@
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/useAuth";
 import { useRef, useState } from "react";
 
 function Dashboard() {
+    const navigate = useNavigate();
     const { user, loading } = useAuth();
 
     const fileInputRef = useRef(null);
@@ -10,6 +12,15 @@ function Dashboard() {
     const [uploading, setUploading] = useState(false);
     const [uploadError, setUploadError] = useState("");
     const [uploadedResume, setUploadedResume] = useState(null);
+
+    const [jobDescription, setJobDescription] = useState("");
+    const [analyzing, setAnalyzing] = useState(false);
+    const [analysisError, setAnalysisError] = useState("");
+    const [analysisResult, setAnalysisResult] = useState(null);
+
+    const [review, setReview] = useState(null)
+    const [reviewing, setReviewing] = useState(false)
+    const [reviewError, setReviewError] = useState("")
 
     if (loading) {
         return (
@@ -88,6 +99,97 @@ function Dashboard() {
         }
     };
 
+    const handleAnalyze = async () => {
+        setAnalysisError("")
+        setAnalysisResult(null)
+
+        if (!uploadedResume){
+            setAnalysisError("Please upload your resume first.")
+            return
+        }
+
+        if(!jobDescription.trim()){
+            setAnalysisError("Please enter a job description.")
+            return
+        }
+
+        try{
+            setAnalyzing(true)
+
+            const formData = new FormData()
+            formData.append("job_description", jobDescription)
+
+            const response = await fetch(
+                "http://127.0.0.1:8000/resume/analyze",
+                {
+                    method: "POST",
+                    credentials: "include",
+                    body: formData,
+                }
+            )
+
+            const data = await response.json()
+
+            if(!response.ok){
+                throw new Error(data.detail || "Failed to analyze resume.")
+            }
+            setAnalysisResult(data)
+        }
+
+        catch (error) {
+            setAnalysisError(error.message)
+        }
+        finally {
+            setAnalyzing(false)
+        }
+    }
+
+    const handleResumeReview = async () => {
+        setReviewError("")
+        setReview(null)
+
+        if (!uploadedResume) {
+            setReviewError("Please upload your resume first.")
+            return
+        }
+
+        if (!jobDescription.trim()) {
+            setReviewError("Please enter a job description first.")
+            return
+        }
+
+        try{
+            setReviewing(true)
+
+            const formData = new FormData()
+            formData.append("job_description", jobDescription)
+
+            const response = await fetch(
+                "http://127.0.0.1:8000/resume/review",
+                {
+                    method: "POST",
+                    credentials: "include",
+                    body: formData,
+                }
+            )
+
+            const data = await response.json()
+
+            if(!response.ok){
+                throw new Error(data.detail || "Failed to generate resume review.")
+            }
+
+            setReview(data)
+        }
+
+        catch (error) {
+            setReviewError(error.message)
+        }
+        finally {
+            setReviewing(false)
+        }
+    }
+
     return (
         <div className="min-h-screen bg-gray-50">
 
@@ -105,6 +207,15 @@ function Dashboard() {
                             ResumeAI
                         </span>
                     </div>
+
+                    {/* History */}
+                    <button
+                        type="button"
+                        onClick={() => navigate("/history")}
+                        className="text-sm font-semibold text-gray-900 hover:text-indigo-700"
+                    >
+                        History
+                    </button>
 
                     {/* User */}
                     <div className="flex items-center gap-3">
@@ -321,9 +432,346 @@ function Dashboard() {
                             </div>
                         )}
 
+                        {/* Job Description */}
+                        {uploadedResume && (
+                            <div className="mt-8">
+
+                                <label className="text-sm font-semibold text-gray-900">
+                                    Job Description
+                                </label>
+
+                                <p className="mt-1 text-sm text-gray-500">
+                                    Paste the job description for the role you are applying for.
+                                </p>
+
+                                <textarea
+                                    value={jobDescription}
+                                    onChange={(e) => setJobDescription(e.target.value)}
+                                    placeholder="Paste the job description here..."
+                                    rows={8}
+                                    className="mt-4 w-full resize-none rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                                />
+
+                                {analysisError && (
+                                    <p className="mt-3 text-sm font-medium text-red-600">
+                                        {analysisError}
+                                    </p>
+                                )}
+
+                                <button
+                                    type="button"
+                                    onClick={handleAnalyze}
+                                    disabled={analyzing}
+                                    className="mt-5 rounded-xl bg-gradient-to-r from-indigo-600 via-violet-600 to-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-200 transition hover:-translate-y-0.5 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                    {analyzing ? "Analyzing..." : "Analyze Resume"}
+                                </button>
+
+                            </div>
+                        )}
+
                     </div>
                 </section>
 
+                {/* Analysis Result */}
+
+                {analysisResult && (
+                    <section className="mt-10">
+                        <div className="rounded-3xl border border-gray-200 bg-white p-8 shadow-sm sm:p-10">
+                            <div>
+                                <span className="inline-flex rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-600">
+                                    Analysis Complete
+                                </span>
+
+                                <h2 className="mt-4 text-2xl font-bold text-gray-900">
+                                    Resume Analysis
+                                </h2>
+
+                                <p className="mt-2 text-sm text-gray-500">
+                                    Here's how your resume matches the job description.
+                                </p>
+                            </div>
+
+                            {/* Scores */}
+                            <div className="mt-8 grid gap-5 sm:grid-cols-3">
+                                {/* Overall Score */}
+                                <div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-6">
+                                    <p className="text-sm font-medium text-indigo-600">
+                                        Overall Score
+                                    </p>
+
+                                    <p className="mt-3 text-4xl font-bold text-indigo-700">
+                                        {(analysisResult.overall_score * 100).toFixed(0)}%
+                                    </p>
+                                </div>
+
+                                {/* Similarity Score */}
+
+                                <div className="rounded-2xl border border-violet-100 bg-violet-50 p-6">
+                                    <p className="text-sm font-medium text-violet-600">
+                                        Resume Similarity
+                                    </p>
+
+                                    <p className="mt-3 text-4xl font-bold text-violet-700">
+                                        {(analysisResult.similarity_score * 100).toFixed(0)}%
+                                    </p>
+                                </div>
+
+                                {/* Skill Match */}
+
+                                <div className="rounded-2xl border border-blue-100 bg-blue-50 p-6">
+                                    <p className="text-sm font-medium text-blue-600">
+                                        Skill Match
+                                    </p>
+
+                                    <p className="mt-3 text-4xl font-bold text-blue-700">
+                                        {(analysisResult.skill_match_score * 100).toFixed(0)}%
+                                    </p>
+                                </div>
+
+                            </div>
+
+
+                            {/* Skills */}
+                            <div className="mt-8 grid gap-6 lg:grid-cols-2">
+
+                                {/* Your Skills */}
+                                <div className="rounded-2xl border border-gray-200 p-6">
+                                    <h3 className="text-lg font-semibold text-gray-900">
+                                        Your Skills
+                                    </h3>
+
+                                    <div className="mt-4 flex flex-wrap gap-2">
+
+                                        {analysisResult.resume_skills.length > 0 ? (
+                                            analysisResult.resume_skills.map((skill) => (
+                                                <span
+                                                    key={skill}
+                                                    className="rounded-full bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700"
+                                                >
+                                                    {skill}
+                                                </span>
+                                            ))
+                                        ) : (
+                                            <p className="text-sm text-gray-500">
+                                                No skills identified.
+                                            </p>
+                                        )}
+
+                                    </div>
+
+                                </div>
+
+                                {/* Job Skills */}
+                                <div className="rounded-2xl border border-gray-200 p-6">
+                                    <h3 className="text-lg font-semibold text-gray-900">
+                                        Job Description Skills
+                                    </h3>
+
+                                    <div className="mt-4 flex flex-wrap gap-2">
+
+                                        {analysisResult.job_skills.length > 0 ? (
+                                            analysisResult.job_skills.map((skill) => (
+                                                <span
+                                                    key={skill}
+                                                    className="rounded-full bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-700"
+                                                >
+                                                    {skill}
+                                                </span>
+                                            ))
+                                        ) : (
+                                            <p className="text-sm text-gray-500">
+                                                No skills identified.
+                                            </p>
+                                        )}
+
+                                    </div>
+
+                                </div>
+
+                                {/* Matching Skills */}
+                                <div className="rounded-2xl border border-green-200 bg-green-50/50 p-6">
+
+                                    <h3 className="text-lg font-semibold text-gray-900">
+                                        Matching Skills
+                                    </h3>
+
+                                    <div className="mt-4 flex flex-wrap gap-2">
+
+                                        {analysisResult.matched_skills.length > 0 ? (
+                                            analysisResult.matched_skills.map((skill) => (
+                                                <span
+                                                    key={skill}
+                                                    className="rounded-full bg-green-100 px-3 py-1.5 text-sm font-medium text-green-700"
+                                                >
+                                                    {skill}
+                                                </span>
+                                            ))
+                                        ) : (
+                                            <p className="text-sm text-gray-500">
+                                                No matching skills found.
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Missing Skills */}
+                                <div className="rounded-2xl border border-red-200 bg-red-50/50 p-6">
+                                    <h3 className="text-lg font-semibold text-gray-900">
+                                        Missing Skills
+                                    </h3>
+
+                                    <div className="mt-4 flex flex-wrap gap-2">
+
+                                        {analysisResult.missing_skills.length > 0 ? (
+                                            analysisResult.missing_skills.map((skill) => (
+                                                <span
+                                                    key={skill}
+                                                    className="rounded-full bg-red-100 px-3 py-1.5 text-sm font-medium text-red-700"
+                                                >
+                                                    {skill}
+                                                </span>
+                                            ))
+                                        ) : (
+                                            <p className="text-sm text-gray-500">
+                                                No missing skills. Great match!
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    
+                        {/* Resume Review */}
+                        <div className="mt-10 border-t border-gray-200 pt-8">
+
+                            <div className="max-w-2xl">
+                                <span className="inline-flex rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-600">
+                                    AI Resume Review
+                                </span>
+
+                                <h3 className="mt-4 text-xl font-bold text-gray-900">
+                                    Get a detailed AI review
+                                </h3>
+
+                                <p className="mt-2 text-sm leading-6 text-gray-500">
+                                    Get personalized feedback on your resume, including its
+                                    strengths, weaknesses, and suggestions for improvement
+                                    based on the job description.
+                                </p>
+                            </div>
+
+                            {reviewError && (
+                                <p className="mt-4 text-sm font-medium text-red-600">
+                                    {reviewError}
+                                </p>
+                            )}
+
+                            <button
+                                type="button"
+                                onClick={handleResumeReview}
+                                disabled={reviewing}
+                                className="mt-6 rounded-xl bg-gradient-to-r from-indigo-600 via-violet-600 to-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-200 transition hover:-translate-y-0.5 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                {reviewing
+                                    ? "Generating Review..."
+                                    : "Review My Resume"}
+                            </button>
+
+                        </div>
+
+                        {review && (
+                            <div className="mt-8 space-y-6">
+
+                                {/* Summary */}
+                                <div className="rounded-2xl border border-indigo-100 bg-indigo-50/50 p-6">
+                                    <h3 className="text-lg font-bold text-gray-900">
+                                        AI Resume Review
+                                    </h3>
+
+                                    <p className="mt-3 leading-7 text-gray-600">
+                                        {review.summary}
+                                    </p>
+                                </div>
+
+
+                                {/* Strengths */}
+                                <div className="rounded-2xl border border-gray-200 bg-white p-6">
+                                    <h3 className="text-lg font-bold text-gray-900">
+                                        Strengths
+                                    </h3>
+
+                                    <ul className="mt-4 space-y-3">
+                                        {review.strengths?.map((strength, index) => (
+                                            <li
+                                                key={index}
+                                                className="flex gap-3 text-sm leading-6 text-gray-600"
+                                            >
+                                                <span className="mt-1 text-green-600">✓</span>
+                                                <span>{strength}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+
+
+                                {/* Weaknesses */}
+                                <div className="rounded-2xl border border-gray-200 bg-white p-6">
+                                    <h3 className="text-lg font-bold text-gray-900">
+                                        Areas to Improve
+                                    </h3>
+
+                                    <ul className="mt-4 space-y-3">
+                                        {review.weaknesses?.map((weakness, index) => (
+                                            <li
+                                                key={index}
+                                                className="flex gap-3 text-sm leading-6 text-gray-600"
+                                            >
+                                                <span className="mt-1 text-amber-500">!</span>
+                                                <span>{weakness}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+
+
+                                {/* Recommendations */}
+                                <div className="rounded-2xl border border-gray-200 bg-white p-6">
+                                    <h3 className="text-lg font-bold text-gray-900">
+                                        Recommendations
+                                    </h3>
+
+                                    <ul className="mt-4 space-y-3">
+                                        {review.recommendations?.map((recommendation, index) => (
+                                            <li
+                                                key={index}
+                                                className="flex gap-3 text-sm leading-6 text-gray-600"
+                                            >
+                                                <span className="mt-1 text-indigo-600">
+                                                    {index + 1}.
+                                                </span>
+                                                <span>{recommendation}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+
+
+                                {/* Final Recommendation */}
+                                <div className="rounded-2xl border border-violet-100 bg-violet-50/50 p-6">
+                                    <h3 className="text-lg font-bold text-gray-900">
+                                        Final Advice
+                                    </h3>
+
+                                    <p className="mt-3 leading-7 text-gray-600">
+                                        {review.final_recommendation}
+                                    </p>
+                                </div>
+
+                            </div>
+                        )}
+                    </section>
+                )}
 
                 {/* Recent Analyses */}
                 <section className="mt-10">
@@ -339,7 +787,6 @@ function Dashboard() {
                             </p>
                         </div>
                     </div>
-
 
                     {/* Empty State */}
                     <div className="mt-5 rounded-2xl border border-gray-200 bg-white p-10 text-center shadow-sm">

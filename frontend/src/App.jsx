@@ -5,6 +5,7 @@ import Login from "./pages/Auth/Login"
 import Dashboard from "./pages/Dashboard/Dashboard"
 import Signup from "./pages/Auth/Signup"
 import { AuthProvider } from "./context/AuthContext"
+import History from "./pages/History/History"
 
 function App() {
 
@@ -30,6 +31,9 @@ function App() {
 
           {/* Dashboard */}
           <Route path="/dashboard" element={<Dashboard />} />
+
+          {/* Analysis history */}
+          <Route path="/history" element={<History />} />
         </Routes>
       </BrowserRouter>
     </AuthProvider>
