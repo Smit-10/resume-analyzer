@@ -1,26 +1,359 @@
-import { useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../../context/useAuth";
-import { useRef, useState } from "react";
+import { FileText, Upload, Check } from "lucide-react";
+import DashboardAnalysis from "../../components/DashboardAnalysis"
+import DashboardResumeReview from "../../components/DashboardResumeReview";
 
 function Dashboard() {
-    const navigate = useNavigate();
     const { user, loading } = useAuth();
 
     const fileInputRef = useRef(null);
 
-    const [selectedFile, setSelectedFile] = useState(null);
+    // Resumes
+    const [resumes, setResumes] = useState([]);
+    const [loadingResumes, setLoadingResumes] = useState(true);
+    const [resumeError, setResumeError] = useState("");
+
+    const [selectedResume, setSelectedResume] = useState(null);
+
+    // Upload
     const [uploading, setUploading] = useState(false);
     const [uploadError, setUploadError] = useState("");
-    const [uploadedResume, setUploadedResume] = useState(null);
 
+    // Analysis
     const [jobDescription, setJobDescription] = useState("");
     const [analyzing, setAnalyzing] = useState(false);
     const [analysisError, setAnalysisError] = useState("");
     const [analysisResult, setAnalysisResult] = useState(null);
 
-    const [review, setReview] = useState(null)
-    const [reviewing, setReviewing] = useState(false)
-    const [reviewError, setReviewError] = useState("")
+    // Review
+    const [review, setReview] = useState(null);
+    const [reviewing, setReviewing] = useState(false);
+    const [reviewError, setReviewError] = useState("");
+
+    /* Fetch Resumes */
+
+    const fetchResumes = async () => {
+        try {
+            setLoadingResumes(true);
+            setResumeError("");
+
+            const response = await fetch(
+                "http://127.0.0.1:8000/resume/",
+                {
+                    method: "GET",
+                    credentials: "include",
+                }
+            );
+
+            const contentType = response.headers.get("content-type");
+
+            if (!contentType?.includes("application/json")) {
+                throw new Error(
+                    "Unable to load resumes. Please make sure the backend is running."
+                );
+            }
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(
+                    data.detail || "Failed to fetch resumes."
+                );
+            }
+
+            setResumes(data.resumes || []);
+
+            // If backend already has an active resume,
+            // automatically select it.
+            const activeResume = (data.resumes || []).find(
+                (resume) => resume.is_active
+            );
+
+            if (activeResume) {
+                setSelectedResume(activeResume);
+            }
+
+        } catch (error) {
+            setResumeError(error.message);
+        } finally {
+            setLoadingResumes(false);
+        }
+    };
+
+    /* Fetch resumes when Dashboard loads */
+
+    useEffect(() => {
+        fetchResumes();
+    }, []);
+
+    /* Select Existing Resume */
+
+    const handleSelectResume = async (resume) => {
+        try {
+            setResumeError("");
+
+            const response = await fetch(
+                `http://127.0.0.1:8000/resume/${resume.id}/activate`,
+                {
+                    method: "PATCH",
+                    credentials: "include",
+                }
+            );
+
+            const contentType = response.headers.get("content-type");
+
+            if (!contentType?.includes("application/json")) {
+                throw new Error(
+                    "Unable to select resume. Please try again."
+                );
+            }
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(
+                    data.detail || "Failed to select resume."
+                );
+            }
+
+            //Refresh resume list because activating one resume
+            //makes the other resumes inactive.
+            await fetchResumes();
+
+            // Set the selected resume immediately.
+            setSelectedResume({
+                ...resume,
+                is_active: true,
+            });
+
+            /*Clear previous analysis/review because a different resume has been selected. */
+            setAnalysisResult(null);
+            setReview(null);
+            setAnalysisError("");
+            setReviewError("");
+
+        } catch (error) {
+            setResumeError(error.message);
+        }
+    };
+
+    /* Open File Picker */
+
+    const handleChooseResume = () => {
+        fileInputRef.current?.click();
+    };
+
+    /* File Selection */
+
+    const handleFileChange = async (event) => {
+        const file = event.target.files?.[0];
+
+        if (!file) {
+            return;
+        }
+
+        setUploadError("");
+
+        //Frontend validation
+        if (file.type !== "application/pdf") {
+            setUploadError("Only PDF files are allowed.");
+
+            event.target.value = "";
+
+            return;
+        }
+
+        await uploadResume(file);
+
+        // Reset input so the same file can be selected again.
+        event.target.value = "";
+    };
+
+    // Upload Resume
+    const uploadResume = async (file) => {
+        try {
+            setUploading(true);
+            setUploadError("");
+
+            const formData = new FormData();
+
+            formData.append("file", file);
+
+            const response = await fetch(
+                "http://127.0.0.1:8000/resume/upload",
+                {
+                    method: "POST",
+                    credentials: "include",
+                    body: formData,
+                }
+            );
+
+            const contentType = response.headers.get("content-type");
+
+            if (!contentType?.includes("application/json")) {
+                throw new Error(
+                    "Unable to upload resume. Please make sure the backend is running."
+                );
+            }
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(
+                    data.detail || "Failed to upload resume."
+                );
+            }
+
+            // The uploaded resume becomes the selected resume.
+            setSelectedResume(data);
+
+            // Refresh resume list.
+            await fetchResumes();
+
+            // Make sure the uploaded resume is selected.
+            setSelectedResume(data);
+
+            // Clear old analysis/review.
+            setAnalysisResult(null);
+            setReview(null);
+            setAnalysisError("");
+            setReviewError("");
+
+        } catch (error) {
+            setUploadError(error.message);
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    // Analyze Resume
+
+    const handleAnalyze = async () => {
+        setAnalysisError("");
+        setAnalysisResult(null);
+
+        if (!selectedResume) {
+            setAnalysisError(
+                "Please select or upload a resume first."
+            );
+            return;
+        }
+
+        if (!jobDescription.trim()) {
+            setAnalysisError(
+                "Please enter a job description."
+            );
+            return;
+        }
+
+        try {
+            setAnalyzing(true);
+
+            const formData = new FormData();
+
+            formData.append(
+                "job_description",
+                jobDescription
+            );
+
+            const response = await fetch(
+                "http://127.0.0.1:8000/resume/analyze",
+                {
+                    method: "POST",
+                    credentials: "include",
+                    body: formData,
+                }
+            );
+
+            const contentType = response.headers.get("content-type");
+
+            if (!contentType?.includes("application/json")) {
+                throw new Error(
+                    "Unable to analyze resume. Please make sure the backend is running."
+                );
+            }
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(
+                    data.detail ||
+                    "Failed to analyze resume."
+                );
+            }
+
+            setAnalysisResult(data);
+
+        } catch (error) {
+            setAnalysisError(error.message);
+        } finally {
+            setAnalyzing(false);
+        }
+    };
+
+    // AI Resume Review
+
+    const handleResumeReview = async () => {
+        setReviewError("");
+        setReview(null);
+
+        if (!selectedResume) {
+            setReviewError("Please select or upload a resume first.");
+            return;
+        }
+
+        if (!jobDescription.trim()) {
+            setReviewError("Please enter a job description first.");
+            return;
+        }
+
+        try {
+            setReviewing(true);
+
+            const formData = new FormData();
+
+            formData.append(
+                "job_description",
+                jobDescription
+            );
+
+            const response = await fetch(
+                "http://127.0.0.1:8000/resume/review",
+                {
+                    method: "POST",
+                    credentials: "include",
+                    body: formData,
+                }
+            );
+
+            const contentType = response.headers.get("content-type");
+
+            if (!contentType?.includes("application/json")) {
+                throw new Error(
+                    "Unable to generate review. Please make sure the backend is running."
+                );
+            }
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(
+                    data.detail ||
+                    "Failed to generate resume review."
+                );
+            }
+
+            setReview(data);
+
+        } catch (error) {
+            setReviewError(error.message);
+        } finally {
+            setReviewing(false);
+        }
+    };
+
+    // Loading
 
     if (loading) {
         return (
@@ -32,219 +365,14 @@ function Dashboard() {
         );
     }
 
-    // Open the file picker
-    const handleChooseResume = () => {
-        fileInputRef.current?.click();
-    };
-
-    // When user selects a file
-    const handleFileChange = async (event) => {
-        const file = event.target.files?.[0];
-
-        if (!file) {
-            return;
-        }
-
-        setUploadError("");
-        setSelectedFile(file);
-
-        // Basic frontend validation
-        if (file.type !== "application/pdf") {
-            setUploadError("Only PDF files are allowed.");
-            setSelectedFile(null);
-
-            // Reset input so the same file can be selected again
-            event.target.value = "";
-
-            return;
-        }
-
-        await uploadResume(file);
-    };
-
-    // Upload resume to backend
-    const uploadResume = async (file) => {
-        setUploading(true);
-        setUploadError("");
-
-        const formData = new FormData();
-        formData.append("file", file);
-
-        try {
-            const response = await fetch(
-                "http://127.0.0.1:8000/resume/upload",
-                {
-                    method: "POST",
-                    credentials: "include",
-                    body: formData,
-                }
-            );
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(
-                    data.detail || "Failed to upload resume."
-                );
-            }
-
-            setUploadedResume(data);
-            setSelectedFile(null);
-
-        } catch (error) {
-            setUploadError(error.message);
-            setUploadedResume(null);
-        } finally {
-            setUploading(false);
-        }
-    };
-
-    const handleAnalyze = async () => {
-        setAnalysisError("")
-        setAnalysisResult(null)
-
-        if (!uploadedResume){
-            setAnalysisError("Please upload your resume first.")
-            return
-        }
-
-        if(!jobDescription.trim()){
-            setAnalysisError("Please enter a job description.")
-            return
-        }
-
-        try{
-            setAnalyzing(true)
-
-            const formData = new FormData()
-            formData.append("job_description", jobDescription)
-
-            const response = await fetch(
-                "http://127.0.0.1:8000/resume/analyze",
-                {
-                    method: "POST",
-                    credentials: "include",
-                    body: formData,
-                }
-            )
-
-            const data = await response.json()
-
-            if(!response.ok){
-                throw new Error(data.detail || "Failed to analyze resume.")
-            }
-            setAnalysisResult(data)
-        }
-
-        catch (error) {
-            setAnalysisError(error.message)
-        }
-        finally {
-            setAnalyzing(false)
-        }
-    }
-
-    const handleResumeReview = async () => {
-        setReviewError("")
-        setReview(null)
-
-        if (!uploadedResume) {
-            setReviewError("Please upload your resume first.")
-            return
-        }
-
-        if (!jobDescription.trim()) {
-            setReviewError("Please enter a job description first.")
-            return
-        }
-
-        try{
-            setReviewing(true)
-
-            const formData = new FormData()
-            formData.append("job_description", jobDescription)
-
-            const response = await fetch(
-                "http://127.0.0.1:8000/resume/review",
-                {
-                    method: "POST",
-                    credentials: "include",
-                    body: formData,
-                }
-            )
-
-            const data = await response.json()
-
-            if(!response.ok){
-                throw new Error(data.detail || "Failed to generate resume review.")
-            }
-
-            setReview(data)
-        }
-
-        catch (error) {
-            setReviewError(error.message)
-        }
-        finally {
-            setReviewing(false)
-        }
-    }
-
     return (
         <div className="min-h-screen bg-gray-50">
 
-            {/* Navbar */}
-            <nav className="border-b border-gray-200 bg-white">
-                <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-
-                    {/* Logo */}
-                    <div className="flex items-center gap-2">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 via-violet-600 to-blue-600 text-lg font-bold text-white">
-                            R
-                        </div>
-
-                        <span className="text-xl font-bold text-gray-900">
-                            ResumeAI
-                        </span>
-                    </div>
-
-                    {/* History */}
-                    <button
-                        type="button"
-                        onClick={() => navigate("/history")}
-                        className="text-sm font-semibold text-gray-900 hover:text-indigo-700"
-                    >
-                        History
-                    </button>
-
-                    {/* User */}
-                    <div className="flex items-center gap-3">
-
-                        <div className="hidden text-right sm:block">
-                            <p className="text-sm font-semibold text-gray-900">
-                                {user?.name}
-                            </p>
-
-                            <p className="text-xs text-gray-500">
-                                {user?.email}
-                            </p>
-                        </div>
-
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-indigo-600 via-violet-600 to-blue-600 text-sm font-bold text-white">
-                            {user?.name?.charAt(0).toUpperCase()}
-                        </div>
-
-                    </div>
-
-                </div>
-            </nav>
-
-
-            {/* Main Content */}
             <main className="mx-auto max-w-7xl px-6 py-10">
 
                 {/* Welcome */}
                 <section>
+
                     <p className="text-sm font-medium text-indigo-600">
                         AI-powered resume analysis
                     </p>
@@ -254,62 +382,263 @@ function Dashboard() {
                     </h1>
 
                     <p className="mt-3 max-w-2xl text-gray-500">
-                        Analyze your resume, compare it with job descriptions,
-                        and discover how you can improve your chances.
+                        Analyze your resume, compare it with job
+                        descriptions, and discover how you can
+                        improve your chances.
                     </p>
+
                 </section>
 
-
                 {/* Stats */}
-                <section className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                <section className="mt-10 grid gap-5 sm:grid-cols-2">
 
-                    {/* Stat 1 */}
                     <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+
                         <p className="text-sm text-gray-500">
-                            Resumes Analyzed
+                            Resumes Available
                         </p>
 
                         <p className="mt-3 text-3xl font-bold text-gray-900">
-                            0
+                            {resumes.length}
                         </p>
 
                         <p className="mt-2 text-xs text-gray-400">
-                            Start your first analysis
+                            Upload and manage your resumes
                         </p>
+
                     </div>
 
-                    {/* Stat 2 */}
                     <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+
                         <p className="text-sm text-gray-500">
-                            Skills Identified
+                            Selected Resume
                         </p>
 
-                        <p className="mt-3 text-3xl font-bold text-violet-600">
-                            0
+                        <p className="mt-3 truncate text-lg font-bold text-violet-600">
+                            {selectedResume
+                                ? selectedResume.original_file_name
+                                : "None selected"}
                         </p>
 
                         <p className="mt-2 text-xs text-gray-400">
-                            Based on your analyses
-                        </p>
-                    </div>
-
-                    {/* Stat 3 */}
-                    <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-                        <p className="text-sm text-gray-500">
-                            Analyses This Month
+                            Used for analysis
                         </p>
 
-                        <p className="mt-3 text-3xl font-bold text-blue-600">
-                            0
-                        </p>
-
-                        <p className="mt-2 text-xs text-gray-400">
-                            Keep improving
-                        </p>
                     </div>
 
                 </section>
 
+                {/* Resume Selection */}
+                <section className="mt-10">
+
+                    <div className="rounded-3xl border border-gray-200 bg-white p-8 shadow-sm sm:p-10">
+
+                        <div className="max-w-2xl">
+
+                            <span className="inline-flex rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-600">
+                                Resume Selection
+                            </span>
+
+                            <h2 className="mt-4 text-2xl font-bold text-gray-900">
+                                Choose your resume
+                            </h2>
+
+                            <p className="mt-2 leading-7 text-gray-500">
+                                Select an existing resume or upload a new
+                                one. The selected resume will be used for
+                                analysis.
+                            </p>
+
+                        </div>
+
+                        {/* Error */}
+                        {resumeError && (
+                            <p className="mt-5 text-sm font-medium text-red-600">
+                                {resumeError}
+                            </p>
+                        )}
+
+                        {/* Loading Resumes */}
+                        {loadingResumes ? (
+                            <div className="mt-8 rounded-2xl border border-gray-200 bg-gray-50 p-8 text-center">
+
+                                <p className="text-sm text-gray-500">
+                                    Loading your resumes...
+                                </p>
+
+                            </div>
+                        ) : resumes.length === 0 ? (
+
+                            /* No Resumes */
+                            <div className="mt-8 rounded-2xl border border-gray-200 bg-gray-50 p-8 text-center">
+
+                                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-gray-100">
+                                    <FileText
+                                        size={24}
+                                        className="text-gray-500"
+                                    />
+                                </div>
+
+                                <p className="mt-4 text-sm text-gray-500">
+                                    You haven't uploaded any resumes yet.
+                                </p>
+
+                            </div>
+
+                        ) : (
+
+                            /* Resume List */
+                            <div className="mt-8 space-y-3">
+
+                                {resumes.map((resume) => {
+
+                                    const isSelected =
+                                        selectedResume?.id === resume.id;
+
+                                    return (
+                                        <div
+                                            key={resume.id}
+                                            className={`flex items-center justify-between gap-4 rounded-2xl border p-5 transition ${
+                                                isSelected
+                                                    ? "border-indigo-200 bg-indigo-50/50"
+                                                    : "border-gray-200 bg-white"
+                                            }`}
+                                        >
+
+                                            <div className="flex min-w-0 items-center gap-4">
+
+                                                <div
+                                                    className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl ${
+                                                        isSelected
+                                                            ? "bg-indigo-100 text-indigo-600"
+                                                            : "bg-gray-100 text-gray-500"
+                                                    }`}
+                                                >
+                                                    <FileText
+                                                        size={22}
+                                                    />
+                                                </div>
+
+
+                                                <div className="min-w-0">
+
+                                                    <p className="truncate text-sm font-semibold text-gray-900">
+                                                        {resume.original_file_name}
+                                                    </p>
+
+                                                    <p className="mt-1 text-xs text-gray-500">
+                                                        Uploaded on{" "}
+                                                        {new Date(
+                                                            resume.uploaded_at
+                                                        ).toLocaleDateString()}
+                                                    </p>
+
+                                                </div>
+
+                                            </div>
+
+
+                                            <div className="flex shrink-0 items-center gap-3">
+
+                                                {isSelected && (
+                                                    <span className="hidden rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700 sm:inline-flex">
+                                                        Selected
+                                                    </span>
+                                                )}
+
+
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        handleSelectResume(
+                                                            resume
+                                                        )
+                                                    }
+                                                    disabled={isSelected}
+                                                    className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                                                        isSelected
+                                                            ? "cursor-default bg-gray-100 text-gray-400"
+                                                            : "bg-indigo-600 text-white hover:bg-indigo-700"
+                                                    }`}
+                                                >
+                                                    {isSelected
+                                                        ? "Selected"
+                                                        : "Select"}
+                                                </button>
+
+                                            </div>
+
+                                        </div>
+                                    );
+                                })}
+
+                            </div>
+                        )}
+
+                        {/* Upload New Resume */}
+                        <div className="mt-6 border-t border-gray-200 pt-6">
+
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept=".pdf,application/pdf"
+                                onChange={handleFileChange}
+                                className="hidden"
+                            />
+
+                            <button
+                                type="button"
+                                onClick={handleChooseResume}
+                                disabled={uploading}
+                                className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-white px-5 py-3 text-sm font-semibold text-indigo-600 transition hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+
+                                <Upload size={18} />
+
+                                {uploading
+                                    ? "Uploading..."
+                                    : "Upload New Resume"}
+
+                            </button>
+
+                            {uploadError && (
+                                <p className="mt-3 text-sm font-medium text-red-600">
+                                    {uploadError}
+                                </p>
+                            )}
+
+                        </div>
+
+                        {/* Selected Resume Confirmation */}
+                        {selectedResume && (
+                            <div className="mt-6 rounded-2xl border border-green-200 bg-green-50 p-5">
+
+                                <div className="flex items-center gap-3">
+
+                                    <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-100 text-green-600">
+                                        <Check size={20} />
+                                    </div>
+
+                                    <div>
+
+                                        <p className="text-sm font-semibold text-gray-900">
+                                            {selectedResume.original_file_name}
+                                        </p>
+
+                                        <p className="mt-1 text-xs text-green-600">
+                                            This resume will be used for analysis.
+                                        </p>
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+                        )}
+
+                    </div>
+
+                </section>
 
                 {/* Analyze Resume */}
                 <section className="mt-10">
@@ -327,485 +656,68 @@ function Dashboard() {
                             </h2>
 
                             <p className="mt-2 leading-7 text-gray-500">
-                                Upload your resume and provide a job description
-                                to get an AI-powered analysis of how well your
-                                resume matches the role.
+                                Provide a job description to compare it
+                                with your selected resume.
                             </p>
 
                         </div>
-
-
-                        {/* Hidden File Input */}
-                        <input
-                            ref={fileInputRef}
-                            type="file"
-                            accept=".pdf,application/pdf"
-                            onChange={handleFileChange}
-                            className="hidden"
-                        />
-
-
-                        {/* Upload Area */}
-                        <div className="mt-8 rounded-2xl border-2 border-dashed border-gray-300 bg-gray-50 p-10 text-center transition hover:border-indigo-400 hover:bg-indigo-50/30">
-
-                            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-100 text-2xl">
-                                📄
-                            </div>
-
-                            <h3 className="mt-4 text-lg font-semibold text-gray-900">
-                                {uploading
-                                    ? "Uploading resume..."
-                                    : "Upload your resume"}
-                            </h3>
-
-                            <p className="mt-2 text-sm text-gray-500">
-                                PDF files are supported
-                            </p>
-
-
-                            {/* Choose Resume Button */}
-                            <button
-                                type="button"
-                                onClick={handleChooseResume}
-                                disabled={uploading}
-                                className="mt-6 rounded-xl bg-gradient-to-r from-indigo-600 via-violet-600 to-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-200 transition hover:-translate-y-0.5 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                                {uploading
-                                    ? "Uploading..."
-                                    : "Choose Resume"}
-                            </button>
-
-
-                            {/* Selected File */}
-                            {selectedFile && !uploadError && (
-                                <p className="mt-4 text-sm text-gray-600">
-                                    Selected:{" "}
-                                    <span className="font-medium text-gray-900">
-                                        {selectedFile.name}
-                                    </span>
-                                </p>
-                            )}
-
-
-                            {/* Upload Error */}
-                            {uploadError && (
-                                <p className="mt-4 text-sm font-medium text-red-600">
-                                    {uploadError}
-                                </p>
-                            )}
-
-                        </div>
-
-
-                        {/* Uploaded Resume */}
-                        {uploadedResume && (
-                            <div className="mt-6 rounded-2xl border border-green-200 bg-green-50 p-5">
-
-                                <div className="flex items-center justify-between gap-4">
-
-                                    <div className="flex items-center gap-3">
-
-                                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-100">
-                                            📄
-                                        </div>
-
-                                        <div>
-                                            <p className="text-sm font-semibold text-gray-900">
-                                                {uploadedResume.original_file_name}
-                                            </p>
-
-                                            <p className="mt-1 text-xs text-green-600">
-                                                Resume uploaded successfully
-                                            </p>
-                                        </div>
-
-                                    </div>
-
-                                    {uploadedResume.is_active && (
-                                        <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
-                                            Active
-                                        </span>
-                                    )}
-
-                                </div>
-
-                            </div>
-                        )}
 
                         {/* Job Description */}
-                        {uploadedResume && (
-                            <div className="mt-8">
+                        <div className="mt-8">
 
-                                <label className="text-sm font-semibold text-gray-900">
-                                    Job Description
-                                </label>
+                            <label className="text-sm font-semibold text-gray-900">
+                                Job Description
+                            </label>
 
-                                <p className="mt-1 text-sm text-gray-500">
-                                    Paste the job description for the role you are applying for.
-                                </p>
+                            <p className="mt-1 text-sm text-gray-500">
+                                Paste the job description for the role
+                                you are applying for.
+                            </p>
 
-                                <textarea
-                                    value={jobDescription}
-                                    onChange={(e) => setJobDescription(e.target.value)}
-                                    placeholder="Paste the job description here..."
-                                    rows={8}
-                                    className="mt-4 w-full resize-none rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
-                                />
+                            <textarea
+                                value={jobDescription}
+                                onChange={(event) =>
+                                    setJobDescription(
+                                        event.target.value
+                                    )
+                                }
+                                placeholder="Paste the job description here..."
+                                rows={8}
+                                className="mt-4 w-full resize-none rounded-2xl border border-gray-300 bg-white px-4 py-3 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                            />
 
-                                {analysisError && (
-                                    <p className="mt-3 text-sm font-medium text-red-600">
-                                        {analysisError}
-                                    </p>
-                                )}
-
-                                <button
-                                    type="button"
-                                    onClick={handleAnalyze}
-                                    disabled={analyzing}
-                                    className="mt-5 rounded-xl bg-gradient-to-r from-indigo-600 via-violet-600 to-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-200 transition hover:-translate-y-0.5 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60"
-                                >
-                                    {analyzing ? "Analyzing..." : "Analyze Resume"}
-                                </button>
-
-                            </div>
-                        )}
-
-                    </div>
-                </section>
-
-                {/* Analysis Result */}
-
-                {analysisResult && (
-                    <section className="mt-10">
-                        <div className="rounded-3xl border border-gray-200 bg-white p-8 shadow-sm sm:p-10">
-                            <div>
-                                <span className="inline-flex rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-600">
-                                    Analysis Complete
-                                </span>
-
-                                <h2 className="mt-4 text-2xl font-bold text-gray-900">
-                                    Resume Analysis
-                                </h2>
-
-                                <p className="mt-2 text-sm text-gray-500">
-                                    Here's how your resume matches the job description.
-                                </p>
-                            </div>
-
-                            {/* Scores */}
-                            <div className="mt-8 grid gap-5 sm:grid-cols-3">
-                                {/* Overall Score */}
-                                <div className="rounded-2xl border border-indigo-100 bg-indigo-50 p-6">
-                                    <p className="text-sm font-medium text-indigo-600">
-                                        Overall Score
-                                    </p>
-
-                                    <p className="mt-3 text-4xl font-bold text-indigo-700">
-                                        {(analysisResult.overall_score * 100).toFixed(0)}%
-                                    </p>
-                                </div>
-
-                                {/* Similarity Score */}
-
-                                <div className="rounded-2xl border border-violet-100 bg-violet-50 p-6">
-                                    <p className="text-sm font-medium text-violet-600">
-                                        Resume Similarity
-                                    </p>
-
-                                    <p className="mt-3 text-4xl font-bold text-violet-700">
-                                        {(analysisResult.similarity_score * 100).toFixed(0)}%
-                                    </p>
-                                </div>
-
-                                {/* Skill Match */}
-
-                                <div className="rounded-2xl border border-blue-100 bg-blue-50 p-6">
-                                    <p className="text-sm font-medium text-blue-600">
-                                        Skill Match
-                                    </p>
-
-                                    <p className="mt-3 text-4xl font-bold text-blue-700">
-                                        {(analysisResult.skill_match_score * 100).toFixed(0)}%
-                                    </p>
-                                </div>
-
-                            </div>
-
-
-                            {/* Skills */}
-                            <div className="mt-8 grid gap-6 lg:grid-cols-2">
-
-                                {/* Your Skills */}
-                                <div className="rounded-2xl border border-gray-200 p-6">
-                                    <h3 className="text-lg font-semibold text-gray-900">
-                                        Your Skills
-                                    </h3>
-
-                                    <div className="mt-4 flex flex-wrap gap-2">
-
-                                        {analysisResult.resume_skills.length > 0 ? (
-                                            analysisResult.resume_skills.map((skill) => (
-                                                <span
-                                                    key={skill}
-                                                    className="rounded-full bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700"
-                                                >
-                                                    {skill}
-                                                </span>
-                                            ))
-                                        ) : (
-                                            <p className="text-sm text-gray-500">
-                                                No skills identified.
-                                            </p>
-                                        )}
-
-                                    </div>
-
-                                </div>
-
-                                {/* Job Skills */}
-                                <div className="rounded-2xl border border-gray-200 p-6">
-                                    <h3 className="text-lg font-semibold text-gray-900">
-                                        Job Description Skills
-                                    </h3>
-
-                                    <div className="mt-4 flex flex-wrap gap-2">
-
-                                        {analysisResult.job_skills.length > 0 ? (
-                                            analysisResult.job_skills.map((skill) => (
-                                                <span
-                                                    key={skill}
-                                                    className="rounded-full bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-700"
-                                                >
-                                                    {skill}
-                                                </span>
-                                            ))
-                                        ) : (
-                                            <p className="text-sm text-gray-500">
-                                                No skills identified.
-                                            </p>
-                                        )}
-
-                                    </div>
-
-                                </div>
-
-                                {/* Matching Skills */}
-                                <div className="rounded-2xl border border-green-200 bg-green-50/50 p-6">
-
-                                    <h3 className="text-lg font-semibold text-gray-900">
-                                        Matching Skills
-                                    </h3>
-
-                                    <div className="mt-4 flex flex-wrap gap-2">
-
-                                        {analysisResult.matched_skills.length > 0 ? (
-                                            analysisResult.matched_skills.map((skill) => (
-                                                <span
-                                                    key={skill}
-                                                    className="rounded-full bg-green-100 px-3 py-1.5 text-sm font-medium text-green-700"
-                                                >
-                                                    {skill}
-                                                </span>
-                                            ))
-                                        ) : (
-                                            <p className="text-sm text-gray-500">
-                                                No matching skills found.
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Missing Skills */}
-                                <div className="rounded-2xl border border-red-200 bg-red-50/50 p-6">
-                                    <h3 className="text-lg font-semibold text-gray-900">
-                                        Missing Skills
-                                    </h3>
-
-                                    <div className="mt-4 flex flex-wrap gap-2">
-
-                                        {analysisResult.missing_skills.length > 0 ? (
-                                            analysisResult.missing_skills.map((skill) => (
-                                                <span
-                                                    key={skill}
-                                                    className="rounded-full bg-red-100 px-3 py-1.5 text-sm font-medium text-red-700"
-                                                >
-                                                    {skill}
-                                                </span>
-                                            ))
-                                        ) : (
-                                            <p className="text-sm text-gray-500">
-                                                No missing skills. Great match!
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    
-                        {/* Resume Review */}
-                        <div className="mt-10 border-t border-gray-200 pt-8">
-
-                            <div className="max-w-2xl">
-                                <span className="inline-flex rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-600">
-                                    AI Resume Review
-                                </span>
-
-                                <h3 className="mt-4 text-xl font-bold text-gray-900">
-                                    Get a detailed AI review
-                                </h3>
-
-                                <p className="mt-2 text-sm leading-6 text-gray-500">
-                                    Get personalized feedback on your resume, including its
-                                    strengths, weaknesses, and suggestions for improvement
-                                    based on the job description.
-                                </p>
-                            </div>
-
-                            {reviewError && (
-                                <p className="mt-4 text-sm font-medium text-red-600">
-                                    {reviewError}
+                            {analysisError && (
+                                <p className="mt-3 text-sm font-medium text-red-600">
+                                    {analysisError}
                                 </p>
                             )}
 
                             <button
                                 type="button"
-                                onClick={handleResumeReview}
-                                disabled={reviewing}
-                                className="mt-6 rounded-xl bg-gradient-to-r from-indigo-600 via-violet-600 to-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-200 transition hover:-translate-y-0.5 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60"
+                                onClick={handleAnalyze}
+                                disabled={analyzing}
+                                className="mt-5 rounded-xl bg-gradient-to-r from-indigo-600 via-violet-600 to-blue-600 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-200 transition hover:-translate-y-0.5 hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60"
                             >
-                                {reviewing
-                                    ? "Generating Review..."
-                                    : "Review My Resume"}
+                                {analyzing
+                                    ? "Analyzing..."
+                                    : "Analyze Resume"}
                             </button>
 
                         </div>
 
-                        {review && (
-                            <div className="mt-8 space-y-6">
-
-                                {/* Summary */}
-                                <div className="rounded-2xl border border-indigo-100 bg-indigo-50/50 p-6">
-                                    <h3 className="text-lg font-bold text-gray-900">
-                                        AI Resume Review
-                                    </h3>
-
-                                    <p className="mt-3 leading-7 text-gray-600">
-                                        {review.summary}
-                                    </p>
-                                </div>
-
-
-                                {/* Strengths */}
-                                <div className="rounded-2xl border border-gray-200 bg-white p-6">
-                                    <h3 className="text-lg font-bold text-gray-900">
-                                        Strengths
-                                    </h3>
-
-                                    <ul className="mt-4 space-y-3">
-                                        {review.strengths?.map((strength, index) => (
-                                            <li
-                                                key={index}
-                                                className="flex gap-3 text-sm leading-6 text-gray-600"
-                                            >
-                                                <span className="mt-1 text-green-600">✓</span>
-                                                <span>{strength}</span>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-
-
-                                {/* Weaknesses */}
-                                <div className="rounded-2xl border border-gray-200 bg-white p-6">
-                                    <h3 className="text-lg font-bold text-gray-900">
-                                        Areas to Improve
-                                    </h3>
-
-                                    <ul className="mt-4 space-y-3">
-                                        {review.weaknesses?.map((weakness, index) => (
-                                            <li
-                                                key={index}
-                                                className="flex gap-3 text-sm leading-6 text-gray-600"
-                                            >
-                                                <span className="mt-1 text-amber-500">!</span>
-                                                <span>{weakness}</span>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-
-
-                                {/* Recommendations */}
-                                <div className="rounded-2xl border border-gray-200 bg-white p-6">
-                                    <h3 className="text-lg font-bold text-gray-900">
-                                        Recommendations
-                                    </h3>
-
-                                    <ul className="mt-4 space-y-3">
-                                        {review.recommendations?.map((recommendation, index) => (
-                                            <li
-                                                key={index}
-                                                className="flex gap-3 text-sm leading-6 text-gray-600"
-                                            >
-                                                <span className="mt-1 text-indigo-600">
-                                                    {index + 1}.
-                                                </span>
-                                                <span>{recommendation}</span>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-
-
-                                {/* Final Recommendation */}
-                                <div className="rounded-2xl border border-violet-100 bg-violet-50/50 p-6">
-                                    <h3 className="text-lg font-bold text-gray-900">
-                                        Final Advice
-                                    </h3>
-
-                                    <p className="mt-3 leading-7 text-gray-600">
-                                        {review.final_recommendation}
-                                    </p>
-                                </div>
-
-                            </div>
-                        )}
-                    </section>
-                )}
-
-                {/* Recent Analyses */}
-                <section className="mt-10">
-
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <h2 className="text-xl font-bold text-gray-900">
-                                Recent Analyses
-                            </h2>
-
-                            <p className="mt-1 text-sm text-gray-500">
-                                Your latest resume analyses will appear here.
-                            </p>
-                        </div>
                     </div>
 
-                    {/* Empty State */}
-                    <div className="mt-5 rounded-2xl border border-gray-200 bg-white p-10 text-center shadow-sm">
-
-                        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-gray-100 text-xl">
-                            📊
-                        </div>
-
-                        <h3 className="mt-4 font-semibold text-gray-900">
-                            No analyses yet
-                        </h3>
-
-                        <p className="mt-2 text-sm text-gray-500">
-                            Upload your first resume to see your analysis
-                            history here.
-                        </p>
-
-                    </div>
                 </section>
+
+                <DashboardAnalysis analysisResult={analysisResult} />
+
+                {/* AI resume review */}
+                <DashboardResumeReview
+                    review={review}
+                    reviewing={reviewing}
+                    reviewError={reviewError}
+                    handleResumeReview={handleResumeReview}
+                />
 
             </main>
 

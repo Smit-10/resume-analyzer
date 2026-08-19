@@ -20,6 +20,7 @@ class AnalysisResponse(BaseModel):
     
     id: int
     resume_id: int
+    original_file_name: str
     job_description: str
     score: float
     matched_skills: list[str]

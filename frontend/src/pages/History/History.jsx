@@ -72,36 +72,6 @@ function History() {
     return (
         <div className="min-h-screen bg-gray-50">
 
-            {/* Navbar */}
-            <nav className="border-b border-gray-200 bg-white">
-                <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-
-                    {/* Logo */}
-                    <div
-                        className="flex cursor-pointer items-center gap-2"
-                        onClick={() => navigate("/dashboard")}
-                    >
-                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 via-violet-600 to-blue-600 text-lg font-bold text-white">
-                            R
-                        </div>
-
-                        <span className="text-xl font-bold text-gray-900">
-                            ResumeAI
-                        </span>
-                    </div>
-
-                    {/* Back to Dashboard */}
-                    <button
-                        type="button"
-                        onClick={() => navigate("/dashboard")}
-                        className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 transition hover:border-indigo-300 hover:bg-indigo-100 hover:text-gray-900"
-                    >
-                        Dashboard
-                    </button>
-
-                </div>
-            </nav>
-
             {/* Main Content */}
             <main className="mx-auto max-w-5xl px-6 py-10">
 
@@ -180,7 +150,7 @@ function History() {
                                             Analysis
                                         </p>
                                         <h2 className="mt-2 text-lg font-semibold text-gray-900">
-                                            Resume Analysis
+                                            {analysis.original_file_name}
                                         </h2>
                                         <p className="mt-2 text-sm text-gray-500">
                                             Analyzed on{" "}

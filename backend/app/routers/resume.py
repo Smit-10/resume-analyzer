@@ -3,13 +3,13 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.models.user import User
 from app.models.resume import Resume
-from app.schemas.resume import ResumeUploadResponse
+from app.schemas.resume import ResumeUploadResponse, ResumeListResponse
 from app.auth.jwt_handler import get_current_user
 from app.schemas.analysis import ExtractedTextResponse, ResumeAnalysisResponse, AnalysisResponse, AnalysisHistoryResponse
 from app.services.analysis_history_service import get_analysis_history, get_analysis_by_id
 from app.services.analysis_service import analyze_resume
-from app.services.resume_service import upload_resume, get_resume_text, get_active_resume, delete_resume
-from app.services.resume_review_service import get_resume_review
+from app.services.resume_service import upload_resume, get_resume_text, get_active_resume, delete_resume, get_user_resumes, set_active_resume
+from app.services.resume_review_service import get_resume_review, get_resume_review_by_analysis
 from app.schemas.resume_review import ResumeReviewResponse
 from app.exceptions.llm_exceptions import LLMResponseError, LLMServiceError
 
@@ -17,6 +17,20 @@ router = APIRouter(
     prefix="/resume",
     tags=["Resume"]
 )
+
+@router.get("/", response_model=ResumeListResponse)
+def get_resumes(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    resumes = get_user_resumes(current_user=current_user, db=db)
+    
+    return ResumeListResponse(resumes=resumes)
+
+@router.patch("/{resume_id}/activate")
+def activate_resume(resume_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    try:
+        return set_active_resume(resume_id=resume_id, current_user=current_user, db=db)
+    
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
 # UploadFile = File (...) means multipart/form-data
 @router.post("/upload", response_model=ResumeUploadResponse, status_code=status.HTTP_201_CREATED)
@@ -97,6 +111,33 @@ def resume_review(job_description: str = Form(...), current_user: User = Depends
         )
     
     except LLMResponseError as e:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="The AI service returned an invalid response. Please try again."
+        )
+
+# getting resume review from analysis id
+@router.post("/review/{analysis_id}", response_model=ResumeReviewResponse)
+def resume_review_by_analysis(analysis_id: int, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    try:
+        review = get_resume_review_by_analysis(
+            analysis_id=analysis_id,
+            current_user=current_user,
+            db=db
+        )
+        
+        return review
+    
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    
+    except LLMServiceError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Resume review service is temporary unavailable. Please try again later."
+        )
+    
+    except LLMResponseError:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail="The AI service returned an invalid response. Please try again."

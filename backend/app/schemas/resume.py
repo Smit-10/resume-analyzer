@@ -8,3 +8,6 @@ class ResumeUploadResponse(BaseModel):
     is_active: bool
     
     model_config = ConfigDict(from_attributes=True)
+
+class ResumeListResponse(BaseModel):
+    resumes: list[ResumeUploadResponse]

@@ -73,6 +73,48 @@ def get_active_resume(current_user: User, db: Session) -> Resume:
     
     return resume
 
+def get_user_resumes(current_user: User, db: Session) -> list[Resume]:
+    resumes = (
+        db.query(Resume)
+        .filter(Resume.user_id == current_user.id)
+        .order_by(Resume.uploaded_at.desc())
+        .all()
+    )
+    
+    return resumes
+
+def set_active_resume(
+    resume_id: int,
+    current_user: User,
+    db: Session
+):
+    # Finding the resume belonging to the current user
+    resume = (
+        db.query(Resume)
+        .filter(Resume.id == resume_id, Resume.user_id == current_user.id)
+        .first()
+    )
+
+    if resume is None:
+        raise ValueError("Resume not found.")
+
+    # Making every other resume of this user inactive
+    db.query(Resume).filter(
+        Resume.user_id == current_user.id,
+        Resume.id != resume_id
+    ).update(
+        {Resume.is_active: False},
+        synchronize_session=False
+    )
+
+    # Making the selected resume active
+    resume.is_active = True
+
+    db.commit()
+    db.refresh(resume)
+
+    return resume
+
 def delete_resume(resume_id: int, current_user: User, db: Session):
     # finding the resume belonging to the current user
     resume = (

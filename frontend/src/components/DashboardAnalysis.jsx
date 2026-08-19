@@ -35,38 +35,47 @@ function DashboardAnalysis({ analysisResult }) {
                 <div className="mt-8 grid gap-5 sm:grid-cols-3">
 
                     {/* Overall Score */}
+
                     <div className="rounded-2xl border border-gray-200 bg-gray-50 p-6">
+
                         <p className="text-sm font-medium text-gray-500">
                             Overall Score
                         </p>
 
                         <p className="mt-3 text-4xl font-bold text-indigo-600">
-                            {analysisResult.overall_score}%
+                            {(analysisResult.overall_score * 100).toFixed(0)}%
                         </p>
+
                     </div>
 
 
                     {/* Similarity Score */}
+
                     <div className="rounded-2xl border border-gray-200 bg-gray-50 p-6">
+
                         <p className="text-sm font-medium text-gray-500">
                             Similarity Score
                         </p>
 
                         <p className="mt-3 text-4xl font-bold text-violet-600">
-                            {analysisResult.similarity_score}%
+                            {(analysisResult.similarity_score * 100).toFixed(0)}%
                         </p>
+
                     </div>
 
 
                     {/* Skill Match */}
+
                     <div className="rounded-2xl border border-gray-200 bg-gray-50 p-6">
+
                         <p className="text-sm font-medium text-gray-500">
                             Skill Match
                         </p>
 
                         <p className="mt-3 text-4xl font-bold text-blue-600">
-                            {analysisResult.skill_match_score}%
+                            {(analysisResult.skill_match_score * 100).toFixed(0)}%
                         </p>
+
                     </div>
 
                 </div>
@@ -77,6 +86,7 @@ function DashboardAnalysis({ analysisResult }) {
                 <div className="mt-8 grid gap-6 lg:grid-cols-2">
 
                     {/* Your Skills */}
+
                     <div className="rounded-2xl border border-gray-200 p-6">
 
                         <h3 className="text-base font-semibold text-gray-900">
@@ -103,10 +113,11 @@ function DashboardAnalysis({ analysisResult }) {
                             )}
 
                         </div>
+
                     </div>
 
-
                     {/* Job Description Skills */}
+
                     <div className="rounded-2xl border border-gray-200 p-6">
 
                         <h3 className="text-base font-semibold text-gray-900">
@@ -115,8 +126,8 @@ function DashboardAnalysis({ analysisResult }) {
 
                         <div className="mt-4 flex flex-wrap gap-2">
 
-                            {analysisResult.job_description_skills?.length > 0 ? (
-                                analysisResult.job_description_skills.map(
+                            {analysisResult.job_skills?.length > 0 ? (
+                                analysisResult.job_skills.map(
                                     (skill, index) => (
                                         <span
                                             key={index}
@@ -133,10 +144,11 @@ function DashboardAnalysis({ analysisResult }) {
                             )}
 
                         </div>
+
                     </div>
 
-
                     {/* Matching Skills */}
+
                     <div className="rounded-2xl border border-green-200 bg-green-50/30 p-6">
 
                         <h3 className="text-base font-semibold text-gray-900">
@@ -145,8 +157,8 @@ function DashboardAnalysis({ analysisResult }) {
 
                         <div className="mt-4 flex flex-wrap gap-2">
 
-                            {analysisResult.matching_skills?.length > 0 ? (
-                                analysisResult.matching_skills.map(
+                            {analysisResult.matched_skills?.length > 0 ? (
+                                analysisResult.matched_skills.map(
                                     (skill, index) => (
                                         <span
                                             key={index}
@@ -163,10 +175,11 @@ function DashboardAnalysis({ analysisResult }) {
                             )}
 
                         </div>
+
                     </div>
 
-
                     {/* Missing Skills */}
+
                     <div className="rounded-2xl border border-red-200 bg-red-50/30 p-6">
 
                         <h3 className="text-base font-semibold text-gray-900">
@@ -193,10 +206,15 @@ function DashboardAnalysis({ analysisResult }) {
                             )}
 
                         </div>
+
                     </div>
+
                 </div>
+
             </div>
+
         </section>
     );
 }
+
 export default DashboardAnalysis;

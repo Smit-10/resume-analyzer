@@ -33,6 +33,26 @@ export function AuthProvider({children}) {
         }
     }
 
+    const logout = async () => {
+        try{
+            await fetch(
+                "http://127.0.0.1:8000/auth/logout",
+                {
+                    method: "POST",
+                    credentials: "include",
+                }
+            )
+        }
+        catch (error) {
+            console.error("Logout error: ", error)
+        }
+        finally {
+            //remove user from frontend state
+            setUser(null)
+        }
+
+    }
+
     useEffect(() => {
         const loadUser = async () => {
             await checkAuth()
@@ -42,7 +62,7 @@ export function AuthProvider({children}) {
     }, [])
 
     return(
-        <AuthContext.Provider value ={{user, setUser, loading, checkAuth}}>
+        <AuthContext.Provider value ={{user, setUser, loading, checkAuth, logout}}>
             {children}
         </AuthContext.Provider>
     )
