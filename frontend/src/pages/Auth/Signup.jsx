@@ -132,6 +132,9 @@ function Signup() {
             {/* Google */}
             <button
               type="button"
+              onClick={() => {
+                window.location.href = "http://127.0.0.1:8000/auth/google"
+              }}
               className="flex w-full items-center justify-center gap-3 rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-700 transition hover:bg-gray-100"
             >
               <span className="text-lg font-bold">

@@ -38,3 +38,49 @@ def login_user(user_data: UserLogin, db: Session) -> Token:
     })
     
     return Token(access_token=access_token, access_type="bearer")
+
+def google_login_user(google_id: str, email: str, name: str, db: Session) -> User:
+    
+    # checking whether this google account already exists
+    user = (
+        db.query(User)
+        .filter(User.google_id == google_id)
+        .first()
+    )
+    
+    if user:
+        return user
+    
+    # checking whether this email already exists
+    user = (
+        db.query(User)
+        .filter(User.email == email)
+        .first()
+    )
+    
+    if user:
+        # if normal account with same email exists,
+        # link the google account to this existing user
+        if user.google_id is None:
+            user.google_id = google_id
+            
+            db.commit()
+            db.refresh(user)
+            
+            return user
+        
+        return user
+    
+    # creating a new google user
+    new_user = User(name=name, email=email, password=None, google_id=google_id)
+    
+    try:
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+        
+        return new_user
+    
+    except Exception:
+        db.rollback()
+        raise
