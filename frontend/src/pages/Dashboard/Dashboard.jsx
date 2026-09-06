@@ -164,6 +164,16 @@ function Dashboard() {
             return;
         }
 
+        const MAX_FILE_SIZE = 2 * 1024 * 1024
+
+        if (file.size > MAX_FILE_SIZE){
+            setUploadError("Resume file must be 2 MB or smaller.");
+            
+            event.target.value = "";
+
+            return;
+        }
+
         await uploadResume(file);
 
         // Reset input so the same file can be selected again.

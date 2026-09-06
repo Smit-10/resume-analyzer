@@ -3,15 +3,14 @@ from sqlalchemy.orm import Session
 from app.models.analysis import Analysis
 from app.models.resume import Resume
 from app.models.user import User
-from app.services.pdf_service import extract_text_from_pdf
+from app.services.resume_service import get_resume_text
 from app.services.text_cleaner import clean_text
 from app.services.nlp_service import preprocess_for_tfidf, calculate_similarity
 from app.services.skill_service import extract_skills
 
 def analyze_resume(resume: Resume, job_description: str, db: Session):
-    pdf_path = Path(resume.file_path)
     
-    raw_text = extract_text_from_pdf(pdf_path)
+    raw_text = get_resume_text(resume)
     
     cleaned_text = clean_text(raw_text)
     

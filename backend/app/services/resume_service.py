@@ -1,15 +1,17 @@
 import os
+import tempfile
 from uuid import uuid4
 from fastapi import UploadFile
 from sqlalchemy.orm import Session
 from app.models.resume import Resume
 from app.models.user import User
-from app.config import UPLOAD_DIRECTORY
 from pathlib import Path
 from app.services.pdf_service import extract_text_from_pdf
 from app.services.redis_service import delete_reviews_for_resume
+from app.supabase import supabase
+from app.config import SUPABASE_STORAGE_BUCKET
 
-UPLOAD_DIRECTORY.mkdir(parents=True, exist_ok=True)
+BUCKET_NAME = SUPABASE_STORAGE_BUCKET
 
 def upload_resume(file: UploadFile, current_user: User, db: Session) -> Resume:
     if not file.filename:
@@ -18,17 +20,38 @@ def upload_resume(file: UploadFile, current_user: User, db: Session) -> Resume:
     if not file.filename.lower().endswith(".pdf"):
         raise ValueError("Only PDF files are allowed.")
     
+    # Maximum allowed file size: 2 MB
+    MAX_FILE_SIZE = 2 * 1024 * 1024
+    
+    # Read only 2 MB + 1 byte.
+    # If we receive more than 2 MB, the file is too large.
+    file_content = file.file.read(MAX_FILE_SIZE + 1)
+
+    if len(file_content) > MAX_FILE_SIZE:
+        raise ValueError("Resume file must be 2 MB or smaller.")
+    
     original_file_name = file.filename
     
     # Generate a unique filename to avoid collisions
     stored_file_name = f"{uuid4()}.pdf"
     
-    stored_file_path = UPLOAD_DIRECTORY/stored_file_name
+    # we will store file inside a folder belonging to user
+    # ex. 3/e23fkm-3rpmgs-3116656500.pdf
+    storage_path = f"{current_user.id}/{stored_file_name}"
     
-    #Now The uploaded file is currently in RAM (temporary memory).
-    # Save it permanently to disk inside the uploads directory.
-    with open(stored_file_path, "wb") as buffer:
-        buffer.write(file.file.read())      # read()-reads the entire PDF as bytes.
+    try:
+        # uploading pdf to supabase storage
+        supabase.storage.from_(BUCKET_NAME).upload(
+            path=storage_path,
+            file=file_content,
+            file_options={
+                "content-type": "application/pdf",
+                "upsert": False
+            }
+        )
+    
+    except Exception:
+        raise ValueError("Failed to upload resume to storage.")
     
     # database operation
     try:
@@ -39,7 +62,7 @@ def upload_resume(file: UploadFile, current_user: User, db: Session) -> Resume:
             
         new_resume = Resume(user_id=current_user.id,
                             original_file_name=original_file_name,
-                            file_path=str(stored_file_path),
+                            file_path=storage_path,
                             is_active=True)
 
         db.add(new_resume)
@@ -52,16 +75,44 @@ def upload_resume(file: UploadFile, current_user: User, db: Session) -> Resume:
     except Exception:
         db.rollback()
         
-        # if the file exists, then delete it
-        if stored_file_path.exists():
-            os.remove(stored_file_path)
+        #If the Database operation failed after storage upload
+        # Remove the uploaded file so we don't leave an orphan
+        try:
+            supabase.storage.from_(BUCKET_NAME).remove(
+                [storage_path]
+            )
+        
+        except Exception:
+            pass
         
         raise
     
 def get_resume_text(resume: Resume) -> str:
-    pdf_path = Path(resume.file_path)
     
-    return extract_text_from_pdf(pdf_path)
+    # downloading the resume from supabase storage temporarily, 
+    # extract its text and then delete the temporary local file
+    try:
+        # downloading the pdf from supabase storage
+        pdf_bytes = supabase.storage.from_(BUCKET_NAME).download(resume.file_path)
+    
+    except Exception:
+        raise ValueError("Failed to download resume from storage.")
+    
+    temp_file_path = None
+    try:
+        # creating a temporary PDF file
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
+            temp_file.write(pdf_bytes)
+            temp_file_path = temp_file.name
+        
+        text = extract_text_from_pdf(Path(temp_file_path))
+        
+        return text
+    
+    finally:
+        # deleting the temporary local file
+        if temp_file_path and os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
 
 # below function is used when we want to download, analyze,
 # delete or preview the resume (it will give back the active resume)
@@ -83,11 +134,7 @@ def get_user_resumes(current_user: User, db: Session) -> list[Resume]:
     
     return resumes
 
-def set_active_resume(
-    resume_id: int,
-    current_user: User,
-    db: Session
-):
+def set_active_resume(resume_id: int, current_user: User, db: Session):
     # Finding the resume belonging to the current user
     resume = (
         db.query(Resume)
@@ -126,11 +173,11 @@ def delete_resume(resume_id: int, current_user: User, db: Session):
     if not resume:
         raise ValueError("Resume not found.")
     
-    # remember whether the resume being deleted is active
+    # remember whether the resume being deleted is active or not (true or false)
     was_active = resume.is_active
     
-    # save the file path before deleting the database object
-    file_path = Path(resume.file_path)
+    # Save the Supabase Storage path before deleting
+    storage_path = resume.file_path
     
     db.delete(resume)
     
@@ -149,9 +196,14 @@ def delete_resume(resume_id: int, current_user: User, db: Session):
             
     db.commit()
     
-    # delete the physical file after successfull database operation
-    if file_path.exists():
-        os.remove(file_path)
+    # Deleting PDF from Supabase storage
+    try:
+        supabase.storage.from_(BUCKET_NAME).remove(
+            [storage_path]
+        )
+    
+    except Exception as e:
+        print(f"Warning: Failed to delete resume from Supabase Storage: {e}")
     
     # Deleting all Redis reviews for this specific resume
     delete_reviews_for_resume(resume_id)
