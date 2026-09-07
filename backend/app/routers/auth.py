@@ -9,7 +9,7 @@ from app.schemas.token import Token
 from app.services.auth_service import register_user, login_user, google_login_user
 from app.auth.jwt_handler import get_current_user, create_access_token
 from app.models.user import User
-from app.config import GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI, FRONTEND_URL, COOKIE_SECURE
+from app.config import GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI, FRONTEND_URL, COOKIE_SECURE, COOKIE_SAMESITE
 
 router = APIRouter(
     prefix="/auth",
@@ -52,7 +52,7 @@ def login(response: Response, form_data: OAuth2PasswordRequestForm = Depends(), 
             value=token.access_token,
             httponly=True,
             secure=COOKIE_SECURE,
-            samesite="lax",
+            samesite=COOKIE_SAMESITE,
             max_age=60*60
         )
         
@@ -69,7 +69,7 @@ def logout(response: Response):
         key="access_token",
         httponly=True,
         secure=COOKIE_SECURE,
-        samesite="lax",
+        samesite=COOKIE_SAMESITE,
     )
     
     return {"message": "Logout successfull"}
@@ -135,7 +135,7 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
             value=access_token,
             httponly=True,
             secure=COOKIE_SECURE,
-            samesite="lax",
+            samesite=COOKIE_SAMESITE,
             max_age=60*60
         )
         
