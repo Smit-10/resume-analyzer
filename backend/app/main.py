@@ -6,7 +6,7 @@ from .models.user import User
 from .models.resume import Resume
 from .models.analysis import Analysis
 from app.routers import auth, resume
-from app.config import SECRET_KEY
+from app.config import SECRET_KEY, FRONTEND_URL
 
 Base.metadata.create_all(bind=engine)
 
@@ -22,6 +22,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",
         "http://127.0.0.1:5173",
+        FRONTEND_URL,
     ],
     allow_credentials=True,
     allow_methods=["*"],

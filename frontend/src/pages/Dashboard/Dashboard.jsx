@@ -4,6 +4,8 @@ import { FileText, Upload, Check } from "lucide-react";
 import DashboardAnalysis from "../../components/DashboardAnalysis"
 import DashboardResumeReview from "../../components/DashboardResumeReview";
 
+const API_URL = import.meta.env.VITE_API_URL
+
 function Dashboard() {
     const { user, loading } = useAuth();
 
@@ -39,7 +41,7 @@ function Dashboard() {
             setResumeError("");
 
             const response = await fetch(
-                "http://127.0.0.1:8000/resume/",
+                `${API_URL}/resume/`,
                 {
                     method: "GET",
                     credentials: "include",
@@ -94,7 +96,7 @@ function Dashboard() {
             setResumeError("");
 
             const response = await fetch(
-                `http://127.0.0.1:8000/resume/${resume.id}/activate`,
+                `${API_URL}/resume/${resume.id}/activate`,
                 {
                     method: "PATCH",
                     credentials: "include",
@@ -191,7 +193,7 @@ function Dashboard() {
             formData.append("file", file);
 
             const response = await fetch(
-                "http://127.0.0.1:8000/resume/upload",
+                `${API_URL}/resume/upload`,
                 {
                     method: "POST",
                     credentials: "include",
@@ -268,7 +270,7 @@ function Dashboard() {
             );
 
             const response = await fetch(
-                "http://127.0.0.1:8000/resume/analyze",
+                `${API_URL}/resume/analyze`,
                 {
                     method: "POST",
                     credentials: "include",
@@ -329,7 +331,7 @@ function Dashboard() {
             );
 
             const response = await fetch(
-                "http://127.0.0.1:8000/resume/review",
+                `${API_URL}/resume/review`,
                 {
                     method: "POST",
                     credentials: "include",

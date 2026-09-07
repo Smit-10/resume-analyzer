@@ -95,7 +95,8 @@ def get_resume_text(resume: Resume) -> str:
         # downloading the pdf from supabase storage
         pdf_bytes = supabase.storage.from_(BUCKET_NAME).download(resume.file_path)
     
-    except Exception:
+    except Exception as e:
+        print(e)
         raise ValueError("Failed to download resume from storage.")
     
     temp_file_path = None

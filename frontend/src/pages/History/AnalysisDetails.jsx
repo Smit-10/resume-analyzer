@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 
+const API_URL = import.meta.env.VITE_API_URL
+
 function AnalysisDetails() {
     const { analysisId } = useParams();
     const navigate = useNavigate();
@@ -20,7 +22,7 @@ function AnalysisDetails() {
                 setError("");
 
                 const response = await fetch(
-                    `http://127.0.0.1:8000/resume/analyses/${analysisId}`,
+                    `${API_URL}/resume/analyses/${analysisId}`,
                     {
                         method: "GET",
                         credentials: "include",
@@ -65,7 +67,7 @@ function AnalysisDetails() {
 
         try{
             const response = await fetch(
-                `http://127.0.0.1:8000/resume/review/${analysisId}`,
+                `${API_URL}/resume/review/${analysisId}`,
                 {
                     method: "POST",
                     credentials: "include",

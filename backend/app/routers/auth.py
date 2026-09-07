@@ -9,7 +9,7 @@ from app.schemas.token import Token
 from app.services.auth_service import register_user, login_user, google_login_user
 from app.auth.jwt_handler import get_current_user, create_access_token
 from app.models.user import User
-from app.config import GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI
+from app.config import GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI, FRONTEND_URL, COOKIE_SECURE
 
 router = APIRouter(
     prefix="/auth",
@@ -51,7 +51,7 @@ def login(response: Response, form_data: OAuth2PasswordRequestForm = Depends(), 
             key="access_token",
             value=token.access_token,
             httponly=True,
-            secure=False,   # make it True when using HTTPS
+            secure=COOKIE_SECURE,
             samesite="lax",
             max_age=60*60
         )
@@ -68,7 +68,7 @@ def logout(response: Response):
     response.delete_cookie(
         key="access_token",
         httponly=True,
-        secure=False,
+        secure=COOKIE_SECURE,
         samesite="lax",
     )
     
@@ -125,7 +125,7 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
         
         # Redirect back to React
         response = RedirectResponse(
-            url="http://127.0.0.1:5173/dashboard",
+            url=f"{FRONTEND_URL}/dashboard",
             status_code=status.HTTP_302_FOUND
         )
         
@@ -134,7 +134,7 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
             key="access_token",
             value=access_token,
             httponly=True,
-            secure=False,
+            secure=COOKIE_SECURE,
             samesite="lax",
             max_age=60*60
         )

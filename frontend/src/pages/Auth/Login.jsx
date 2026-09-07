@@ -2,6 +2,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { useAuth } from "../../context/useAuth";
 
+const API_URL = import.meta.env.VITE_API_URL
+
 function Login() {
     const navigate = useNavigate()
     const { checkAuth } = useAuth()
@@ -28,7 +30,7 @@ function Login() {
             formData.append("username", email)
             formData.append("password", password)
 
-            const response = await fetch("http://127.0.0.1:8000/auth/login", {
+            const response = await fetch(`${API_URL}/auth/login`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/x-www-form-urlencoded",

@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+const API_URL = import.meta.env.VITE_API_URL
+
 function History() {
     const navigate = useNavigate();
 
@@ -15,7 +17,7 @@ function History() {
                 setError("");
 
                 const response = await fetch(
-                    "http://127.0.0.1:8000/resume/analyses",
+                    `${API_URL}/resume/analyses`,
                     {
                         method: "GET",
                         credentials: "include",

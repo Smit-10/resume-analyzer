@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 
+const API_URL = import.meta.env.VITE_API_URL
+
 function ResumeManagement() {
     const [resumes, setResumes] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -13,7 +15,7 @@ function ResumeManagement() {
             setError("");
 
             const response = await fetch(
-                "http://127.0.0.1:8000/resume/",
+                `${API_URL}/resume/`,
                 {
                     method: "GET",
                     credentials: "include",
@@ -42,7 +44,7 @@ function ResumeManagement() {
             setError("");
 
             const response = await fetch(
-                `http://127.0.0.1:8000/resume/${resumeId}/activate`,
+                `${API_URL}/resume/${resumeId}/activate`,
                 {
                     method: "PATCH",
                     credentials: "include",
@@ -80,7 +82,7 @@ function ResumeManagement() {
             setDeletingId(resumeId);
 
             const response = await fetch(
-                `http://127.0.0.1:8000/resume/${resumeId}`,
+                `${API_URL}/resume/${resumeId}`,
                 {
                     method: "DELETE",
                     credentials: "include",

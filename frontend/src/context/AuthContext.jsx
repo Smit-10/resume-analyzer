@@ -1,5 +1,7 @@
 import { createContext, useEffect, useState } from 'react'
 
+const API_URL = import.meta.env.VITE_API_URL
+
 export const AuthContext = createContext()
 
 export function AuthProvider({children}) {
@@ -9,7 +11,7 @@ export function AuthProvider({children}) {
     const checkAuth = async () => {
         try{
             const response = await fetch(
-                "http://127.0.0.1:8000/auth/me",
+                `${API_URL}/auth/me`,
                 {
                     method: "GET",
                     credentials: "include",
@@ -36,7 +38,7 @@ export function AuthProvider({children}) {
     const logout = async () => {
         try{
             await fetch(
-                "http://127.0.0.1:8000/auth/logout",
+                `${API_URL}/auth/logout`,
                 {
                     method: "POST",
                     credentials: "include",
