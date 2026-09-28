@@ -35,3 +35,7 @@ app.include_router(resume.router)
 @app.get('/')
 def root():
     return {"message": "AI Resume Analyzer"}
+
+@app.get('/health')
+def health_check():
+    return {"status": "ok"}
