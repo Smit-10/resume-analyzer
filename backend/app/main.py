@@ -36,6 +36,7 @@ app.include_router(resume.router)
 def root():
     return {"message": "AI Resume Analyzer"}
 
-@app.get('/health')
+# checking the health, used by cronjob for waking up the server
+@app.get("/health")
 def health_check():
     return {"status": "ok"}
